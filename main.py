@@ -3,6 +3,7 @@
 import asyncio
  
 import discord
+from youtubesearchpython import VideosSearch
 import yt_dlp as youtube_dl
  
 from discord.ext import commands
@@ -75,7 +76,21 @@ class Music(commands.Cog):
     
    
     @commands.command()
-    async def play(self, ctx, *, url):
+    async def play(self, ctx, *, keyword):
+        """Stream music from youtube"""
+ 
+        async with ctx.typing():
+            videosSearch = VideosSearch(keyword, limit = 1)
+            url = videosSearch.result()['result'][0]['link']
+            
+            player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+            ctx.voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
+ 
+        await ctx.send(f'Now playing: {player.title}')
+    
+   
+    @commands.command()
+    async def url(self, ctx, *, url):
         """Streams from a url (same as yt, but doesn't predownload)"""
  
         async with ctx.typing():

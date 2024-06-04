@@ -1,4 +1,4 @@
-pip install discord.py yt-dlp PyNaCl
+`pip install discord.py yt-dlp PyNaCl`
 
 
 ### FFMPEG
