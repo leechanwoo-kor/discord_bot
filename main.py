@@ -1,5 +1,3 @@
-# This example requires the 'message_content' privileged intent to function.
-
 import asyncio
 import discord
 from youtubesearchpython import VideosSearch
@@ -12,12 +10,14 @@ from utils.ytdl import YTDLSource
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.loop = False  # 루프 상태 저장 변수 추가
+        self.current_url = None  # 현재 재생 중인 URL 저장
 
     @commands.command()
     async def join(self, ctx):
         """Joins a voice channel"""
 
-        channel = ctx.author.voive.channel
+        channel = ctx.author.voice.channel
 
         if ctx.voice_client is not None:
             return await ctx.voice_client.move_to(channel)
@@ -30,7 +30,6 @@ class Music(commands.Cog):
 
         async with ctx.typing():
             videosSearch = VideosSearch(keyword, limit=1)
-            videosSearch = VideosSearch(keyword, limit=1)
             result = videosSearch.result()["result"][0]
             url = result["link"]
             title = result["title"]
@@ -39,9 +38,11 @@ class Music(commands.Cog):
             views = result["viewCount"]["text"]
             duration = result["duration"]
 
+            self.current_url = url  # 현재 재생 중인 URL 저장
+
             player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
             ctx.voice_client.play(
-                player, after=lambda e: print(f"Player error: {e}") if e else None
+                player, after=lambda e: self.after_play(ctx, e)
             )
 
         embed = discord.Embed(
@@ -63,17 +64,42 @@ class Music(commands.Cog):
                 custom_id="pause_resume",
             )
         )
+        view.add_item(
+            discord.ui.Button(
+                label="🔁",
+                style=discord.ButtonStyle.secondary,
+                custom_id="toggle_loop",
+            )
+        )
 
         await ctx.send(embed=embed, view=view)
+
+    def after_play(self, ctx, error):
+        if error:
+            print(f"Player error: {error}")
+        if self.loop and self.current_url:
+            coro = self.play_url(ctx, self.current_url)
+            fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
+            try:
+                fut.result()
+            except Exception as e:
+                print(f"Error resuming playback: {e}")
+
+    async def play_url(self, ctx, url):
+        player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+        ctx.voice_client.play(
+            player, after=lambda e: self.after_play(ctx, e)
+        )
 
     @commands.command()
     async def url(self, ctx, *, url):
         """Streams from a url (same as yt, but doesn't predownload)"""
 
         async with ctx.typing():
+            self.current_url = url  # 현재 재생 중인 URL 저장
             player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
             ctx.voice_client.play(
-                player, after=lambda e: print(f"Player error: {e}") if e else None
+                player, after=lambda e: self.after_play(ctx, e)
             )
 
         await ctx.send(f"Now playing: {player.title}")
@@ -99,7 +125,7 @@ class Music(commands.Cog):
         """음악을 일시정지 할 수 있습니다."""
 
         if ctx.voice_client.is_paused() or not ctx.voice_client.is_playing():
-            await ctx.send("음악이 이미 일시 정지 중이거나 재생 중이지 않습니다.")
+            return await ctx.send("음악이 이미 일시 정지 중이거나 재생 중이지 않습니다.")
 
         ctx.voice_client.pause()
 
@@ -108,9 +134,16 @@ class Music(commands.Cog):
         """일시정지된 음악을 다시 재생할 수 있습니다."""
 
         if ctx.voice_client.is_playing() or not ctx.voice_client.is_paused():
-            await ctx.send("음악이 이미 재생 중이거나 재생할 음악이 존재하지 않습니다.")
+            return await ctx.send("음악이 이미 재생 중이거나 재생할 음악이 존재하지 않습니다.")
 
         ctx.voice_client.resume()
+
+    @commands.command()
+    async def loop(self, ctx):
+        """Toggles loop on/off"""
+
+        self.loop = not self.loop
+        await ctx.send(f"Loop is now {'enabled' if self.loop else 'disabled'}.")
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
@@ -160,6 +193,12 @@ async def on_interaction(interaction):
                 await interaction.response.send_message(
                     "재생 중인 음악이 없습니다.", ephemeral=True
                 )
+        elif custom_id == "toggle_loop":
+            music_cog = bot.get_cog("Music")
+            music_cog.loop = not music_cog.loop
+            await interaction.response.send_message(
+                f"Loop is now {'enabled' if music_cog.loop else 'disabled'}.", ephemeral=True
+            )
 
 
 async def main():
