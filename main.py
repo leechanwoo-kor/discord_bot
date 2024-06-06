@@ -4,6 +4,8 @@ from youtubesearchpython import VideosSearch
 from discord.ext import commands
 from config import Token
 from utils.ytdl import YTDLSource
+import discord.ui
+from discord import InteractionType
 
 
 # 음악 재생 클래스. 커맨드 포함.
@@ -41,9 +43,7 @@ class Music(commands.Cog):
             self.current_url = url  # 현재 재생 중인 URL 저장
 
             player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
-            ctx.voice_client.play(
-                player, after=lambda e: self.after_play(ctx, e)
-            )
+            ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
 
         embed = discord.Embed(
             title="Now Playing",
@@ -87,9 +87,7 @@ class Music(commands.Cog):
 
     async def play_url(self, ctx, url):
         player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
-        ctx.voice_client.play(
-            player, after=lambda e: self.after_play(ctx, e)
-        )
+        ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
 
     @commands.command()
     async def url(self, ctx, *, url):
@@ -98,9 +96,7 @@ class Music(commands.Cog):
         async with ctx.typing():
             self.current_url = url  # 현재 재생 중인 URL 저장
             player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
-            ctx.voice_client.play(
-                player, after=lambda e: self.after_play(ctx, e)
-            )
+            ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
 
         await ctx.send(f"Now playing: {player.title}")
 
@@ -125,7 +121,9 @@ class Music(commands.Cog):
         """음악을 일시정지 할 수 있습니다."""
 
         if ctx.voice_client.is_paused() or not ctx.voice_client.is_playing():
-            return await ctx.send("음악이 이미 일시 정지 중이거나 재생 중이지 않습니다.")
+            return await ctx.send(
+                "음악이 이미 일시 정지 중이거나 재생 중이지 않습니다."
+            )
 
         ctx.voice_client.pause()
 
@@ -134,7 +132,9 @@ class Music(commands.Cog):
         """일시정지된 음악을 다시 재생할 수 있습니다."""
 
         if ctx.voice_client.is_playing() or not ctx.voice_client.is_paused():
-            return await ctx.send("음악이 이미 재생 중이거나 재생할 음악이 존재하지 않습니다.")
+            return await ctx.send(
+                "음악이 이미 재생 중이거나 재생할 음악이 존재하지 않습니다."
+            )
 
         ctx.voice_client.resume()
 
@@ -182,22 +182,24 @@ async def on_interaction(interaction):
             if interaction.guild.voice_client.is_playing():
                 interaction.guild.voice_client.pause()
                 await interaction.response.send_message(
-                    "음악을 일시정지 했습니다.", ephemeral=True
+                    "음악을 일시정지 했습니다.", ephemeral=True, delete_after=5
                 )
             elif interaction.guild.voice_client.is_paused():
                 interaction.guild.voice_client.resume()
                 await interaction.response.send_message(
-                    "음악을 다시 재생합니다.", ephemeral=True
+                    "음악을 다시 재생합니다.", ephemeral=True, delete_after=5
                 )
             else:
                 await interaction.response.send_message(
-                    "재생 중인 음악이 없습니다.", ephemeral=True
+                    "재생 중인 음악이 없습니다.", ephemeral=True, delete_after=5
                 )
         elif custom_id == "toggle_loop":
             music_cog = bot.get_cog("Music")
             music_cog.loop = not music_cog.loop
             await interaction.response.send_message(
-                f"Loop is now {'enabled' if music_cog.loop else 'disabled'}.", ephemeral=True
+                f"Loop is now {'enabled' if music_cog.loop else 'disabled'}.",
+                ephemeral=True,
+                delete_after=5,
             )
 
 
