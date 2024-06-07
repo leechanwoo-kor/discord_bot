@@ -39,7 +39,7 @@ class Music(commands.Cog):
             await ctx.send("You are not connected to a voice channel.")
             raise commands.CommandError("Author not connected to a voice channel.")
 
-    @commands.command(aliases=["p", "ㅔ"])
+    @commands.command(aliases=["p", "P", "ㅔ"])
     async def play(self, ctx, *, keyword=None):
         if keyword:
             async with ctx.typing():
@@ -102,18 +102,20 @@ class Music(commands.Cog):
         result = videosSearch.result()["result"][0]
         thumbnail = result["thumbnails"][0]["url"]
         channel = result["channel"]["name"]
-        views = result["viewCount"]["text"]
         duration = result["duration"]
 
+        play_status = "⏸️" if ctx.voice_client.is_paused() else "▶️"
+        loop_status = "Y" if self.loop else "N"
+
         embed = discord.Embed(
-            title=f"💿  Now Playing | {channel}",
+            title=f"{play_status}  Now Playing  💿  | {channel}",
             description=f"[{title}]({url})",
             color=discord.Color.blue(),
         )
         embed.set_thumbnail(url=thumbnail)
-        embed.add_field(name="Duration", value=duration, inline=True)
+        embed.add_field(name="길이", value=duration, inline=True)
         embed.add_field(name="요청자", value=ctx.author.mention, inline=True)
-        embed.add_field(name="음성채널", value=ctx.channel.name, inline=True)
+        embed.add_field(name="반복", value=loop_status, inline=True)
 
         view = discord.ui.View()
         view.add_item(
@@ -234,22 +236,20 @@ class Music(commands.Cog):
 async def handle_interaction(interaction):
     custom_id = interaction.data["custom_id"]
     music_cog = interaction.client.get_cog("Music")
+    ctx = await interaction.client.get_context(interaction.message)
 
     if custom_id == "pause_resume":
         if interaction.guild.voice_client.is_playing():
             interaction.guild.voice_client.pause()
-            await interaction.response.send_message(
-                "음악을 일시정지 했습니다.", ephemeral=True, delete_after=5
-            )
+            await music_cog.send_now_playing(ctx, music_cog.current_url, music_cog.current_title)
         elif interaction.guild.voice_client.is_paused():
             interaction.guild.voice_client.resume()
-            await interaction.response.send_message(
-                "음악을 다시 재생합니다.", ephemeral=True, delete_after=5
-            )
+            await music_cog.send_now_playing(ctx, music_cog.current_url, music_cog.current_title)
         else:
             await interaction.response.send_message(
                 "재생 중인 음악이 없습니다.", ephemeral=True, delete_after=5
             )
+        
 
     elif custom_id == "skip":
         if interaction.guild.voice_client.is_playing():
@@ -259,8 +259,9 @@ async def handle_interaction(interaction):
             interaction.guild.voice_client.stop()
         else:
             await interaction.response.send_message(
-                "No song is currently playing.", ephemeral=True
+                "No song is currently playing.", ephemeral=True, delete_after=5
             )
+        await music_cog.send_now_playing(ctx, music_cog.current_url, music_cog.current_title)
 
     elif custom_id == "stop":
         if interaction.guild.voice_client.is_connected():
@@ -268,36 +269,28 @@ async def handle_interaction(interaction):
                 await music_cog.now_playing_message.delete()
                 music_cog.now_playing_message = None
             await interaction.guild.voice_client.disconnect()
-            await interaction.response.send_message(
-                "음악을 중지했습니다.", ephemeral=True, delete_after=5
-            )
-        else:
-            await interaction.response.send_message(
-                "봇이 음성 채널에 연결되어 있지 않습니다.",
-                ephemeral=True,
-                delete_after=5,
-            )
 
     elif custom_id == "toggle_loop":
         music_cog.loop = not music_cog.loop
-        await interaction.response.send_message(
-            f"Loop is now {'enabled' if music_cog.loop else 'disabled'}.",
-            ephemeral=True,
-            delete_after=5,
-        )
+        await music_cog.send_now_playing(ctx, music_cog.current_url, music_cog.current_title)
 
     elif custom_id == "show_queue":
         await interaction.response.defer()
         if not music_cog.queue:
             await interaction.followup.send("Queue is empty.", ephemeral=True)
         else:
+            max_title_length = 45
             queue_list = "\n".join(
                 [
-                    f"{idx + 1}. {title}"
+                    f"{idx + 1}. {title[: max_title_length - 3] + '...' if len(title) > max_title_length else title}"
                     for idx, (url, title) in enumerate(music_cog.queue)
                 ]
             )
-            current = interaction.guild.voice_client.source.title if interaction.guild.voice_client and interaction.guild.voice_client.is_playing() else "No song is currently playing."
+            current = (
+                music_cog.current_title[: max_title_length - 3] + '...' if len(music_cog.current_title) > max_title_length else music_cog.current_title
+                if music_cog.current_title
+                else "No song is currently playing."
+            )
             embed = discord.Embed(
                 title="🎶 Current Queue",
                 description=f"**Now Playing:** {current}\n\n**Up Next:**\n{queue_list}",
