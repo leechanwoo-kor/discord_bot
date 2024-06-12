@@ -3,7 +3,7 @@ import discord
 from youtubesearchpython import VideosSearch
 from discord.ext import commands
 from utils.ytdl import YTDLSource
-from utils.utils import ellipsis
+from utils.utils import ellipsis, get_translation
 import discord.ui
 
 
@@ -14,6 +14,10 @@ class Music(commands.Cog):
         self.current = None
         self.queue = []
         self.now_playing_message = None
+
+    def get_user_locale(self, ctx):
+        # return self.user_locales.get(ctx.author.id, "ko")
+        return "ja"
 
     async def join_voice_channel(self, ctx):
         channel = ctx.author.voice.channel
@@ -26,23 +30,27 @@ class Music(commands.Cog):
 
     async def play_next(self, ctx):
         if self.queue:
-            next_url, next_title = self.queue.pop(0)
-            await self.play_url(ctx, next_url, next_title)
+            next_item = self.queue.pop(0)
+            await self.play_url(ctx, next_item)
         else:
-            await ctx.send("대기열이 비어있습니다.", delete_after=3)
+            locale = self.get_user_locale(ctx)
+            await ctx.send(get_translation("queue_empty", locale), delete_after=3)
 
     @commands.command()
     async def join(self, ctx):
+        locale = self.get_user_locale(ctx)
         if ctx.author.voice:
             await self.join_voice_channel(ctx)
         else:
-            await ctx.send("You are not connected to a voice channel.")
-            raise commands.CommandError("Author not connected to a voice channel.")
+            message = get_translation("join_voice_channel", locale)
+            await ctx.send(message)
+            raise commands.CommandError(message)
 
     @commands.command(aliases=["p", "P", "ㅔ"])
     async def play(self, ctx, *, keyword=None):
+        locale = self.get_user_locale(ctx)
         if not keyword:
-            await ctx.send("키워드를 입력하세요.", delete_after=3)
+            await ctx.send(get_translation("enter_keyword", locale), delete_after=3)
             await ctx.message.delete()
             return
 
@@ -52,9 +60,8 @@ class Music(commands.Cog):
             self.queue.append(result)
 
             if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
-                result = self.queue.pop(0)
-                await self.play_url(ctx, result)
-            elif ctx.voice_client.is_playing():
+                await self.play_url(ctx, self.queue.pop(0))
+            else:
                 await self.send_queue(ctx)
         await ctx.message.delete()
 
@@ -81,35 +88,43 @@ class Music(commands.Cog):
             await ctx.send(f"Error playing URL: {e}")
 
     async def send_now_playing(self, ctx, current):
-        url = current["link"]
-        title = ellipsis(current["title"])
-        thumbnail = current["thumbnails"][0]["url"]
-        channel = current["channel"]["name"]
-        duration = current["duration"]
-
-        max_title_length = 45
-        if len(title) > max_title_length:
-            title = title[: max_title_length - 3] + "..."
-
-        play_status = "⏸️" if ctx.voice_client.is_paused() else "▶️"
-        loop_status = "Y" if self.loop else "N"
-
-        embed = discord.Embed(
-            title=f"{play_status}  Now Playing  💿  | {channel}",
-            description=f"[{title}]({url})",
-            color=discord.Color.lighter_grey(),
-        )
-        embed.set_thumbnail(url=thumbnail)
-        embed.add_field(name="길이", value=duration, inline=True)
-        embed.add_field(name="요청자", value=ctx.author.mention, inline=True)
-        embed.add_field(name="반복", value=loop_status, inline=True)
-
+        locale = self.get_user_locale(ctx)
+        embed = self.create_now_playing_embed(ctx, current, locale)
         view = self.create_view()
 
         if self.now_playing_message:
             await self.now_playing_message.delete()
 
         self.now_playing_message = await ctx.send(embed=embed, view=view)
+
+    def create_now_playing_embed(self, ctx, current, locale):
+        url = current["link"]
+        title = ellipsis(current["title"])
+        thumbnail = current["thumbnails"][0]["url"]
+        channel = current["channel"]["name"]
+        duration = current["duration"]
+
+        play_status = "⏸️" if ctx.voice_client.is_paused() else "▶️"
+        loop_status = "Y" if self.loop else "N"
+
+        embed = discord.Embed(
+            title=f"{play_status}  {get_translation('playing_now', locale)}  💿  | {channel}",
+            description=f"[{title}]({url})",
+            color=discord.Color.lighter_grey(),
+        )
+        embed.set_thumbnail(url=thumbnail)
+        embed.add_field(
+            name=get_translation("length", locale), value=duration, inline=True
+        )
+        embed.add_field(
+            name=get_translation("requester", locale),
+            value=ctx.author.mention,
+            inline=True,
+        )
+        embed.add_field(
+            name=get_translation("loop", locale), value=loop_status, inline=True
+        )
+        return embed
 
     def create_view(self):
         view = discord.ui.View()
@@ -127,9 +142,10 @@ class Music(commands.Cog):
         return view
 
     async def send_queue(self, ctx):
+        locale = self.get_user_locale(ctx)
         if not self.queue:
             embed = discord.Embed(
-                description="🎶 대기열이 비어있습니다.",
+                description=get_translation("queue_empty", locale),
                 color=discord.Color.green(),
             )
             await ctx.send(embed=embed, delete_after=3)
@@ -142,25 +158,30 @@ class Music(commands.Cog):
                 ]
             )
             embed = discord.Embed(
-                title="🎶 Current Queue",
-                description=f"**Now Playing:** {now}\n\n**Up Next:**\n{queue_list}",
+                title=get_translation("current_queue", locale),
+                description=f"**{get_translation('playing_now', locale)}:** {now}\n\n**{get_translation('up_next', locale)}:**\n{queue_list}",
                 color=discord.Color.green(),
             )
             await ctx.send(embed=embed, delete_after=3)
 
     @commands.command()
     async def volume(self, ctx, volume: int):
+        locale = self.get_user_locale(ctx)
         ctx.voice_client.source.volume = volume / 100
-        await ctx.send(f"Changed volume to {volume}%")
+        await ctx.send(
+            get_translation("volume_changed", locale, volume=volume), delete_after=3
+        )
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
+        locale = self.get_user_locale(ctx)
         if ctx.voice_client is None:
             if ctx.author.voice:
                 await self.join_voice_channel(ctx)
             else:
-                await ctx.send("You are not connected to a voice channel.")
-                raise commands.CommandError("Author not connected to a voice channel.")
+                message = get_translation("join_voice_channel", locale)
+                await ctx.send(message, delete_after=3)
+                raise commands.CommandError(message)
 
 
 async def setup(bot):

@@ -1,0 +1,13 @@
+{
+    "join_voice_channel": "你没有连接到语音频道。",
+    "queue_empty": "队列是空的。",
+    "playing_now": "正在播放",
+    "added_to_queue": "已添加到队列: {title}",
+    "current_queue": "🎶 当前队列",
+    "volume_changed": "音量已更改为 {volume}%",
+    "length": "长度",
+    "requester": "请求者",
+    "loop": "循环",
+    "up_next": "接下来",
+    "enter_keyword": "请输入关键词。"
+}

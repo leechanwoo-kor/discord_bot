@@ -1,0 +1,13 @@
+{
+    "join_voice_channel": "ボイスチャネルに接続されていません。",
+    "queue_empty": "キューが空です。",
+    "playing_now": "再生中",
+    "added_to_queue": "キューに追加されました: {title}",
+    "current_queue": "🎶 現在のキュー",
+    "volume_changed": "ボリュームを {volume}% に変更しました",
+    "length": "長さ",
+    "requester": "リクエスター",
+    "loop": "ループ",
+    "up_next": "次へ",
+    "enter_keyword": "キーワードを入力してください。"
+}

@@ -1,0 +1,13 @@
+{
+    "join_voice_channel": "You are not connected to a voice channel.",
+    "queue_empty": "The queue is empty.",
+    "playing_now": "Now Playing",
+    "added_to_queue": "Added to queue: {title}",
+    "current_queue": "🎶 Current Queue",
+    "volume_changed": "Changed volume to {volume}%",
+    "length": "Length",
+    "requester": "Requester",
+    "loop": "Loop",
+    "up_next": "Up Next",
+    "enter_keyword": "Please enter a keyword."
+}
