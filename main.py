@@ -25,6 +25,7 @@ async def on_ready():
 async def main():
     async with bot:
         await bot.load_extension("cogs.music")
+        await bot.load_extension("cogs.interactions")
         await bot.start(Token)
 
 

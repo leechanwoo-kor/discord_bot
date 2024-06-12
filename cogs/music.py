@@ -3,7 +3,7 @@ import discord
 from youtubesearchpython import VideosSearch
 from discord.ext import commands
 from utils.ytdl import YTDLSource
-from discord import InteractionType
+from utils.utils import ellipsis
 import discord.ui
 
 
@@ -11,7 +11,7 @@ class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.loop = False
-        self.current_url = None
+        self.current = None
         self.queue = []
         self.now_playing_message = None
 
@@ -29,7 +29,7 @@ class Music(commands.Cog):
             next_url, next_title = self.queue.pop(0)
             await self.play_url(ctx, next_url, next_title)
         else:
-            await ctx.send("Queue is empty.")
+            await ctx.send("대기열이 비어있습니다.", delete_after=3)
 
     @commands.command()
     async def join(self, ctx):
@@ -42,20 +42,18 @@ class Music(commands.Cog):
     @commands.command(aliases=["p", "P", "ㅔ"])
     async def play(self, ctx, *, keyword=None):
         if not keyword:
-            await ctx.send("키워드를 입력하세요.", ephemeral=True)
+            await ctx.send("키워드를 입력하세요.", delete_after=3)
             await ctx.message.delete()
             return
 
         async with ctx.typing():
             videosSearch = VideosSearch(keyword, limit=1)
             result = videosSearch.result()["result"][0]
-            url = result["link"]
-            title = result["title"]
-            self.queue.append((url, title))
+            self.queue.append(result)
 
             if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
-                next_url, next_title = self.queue.pop(0)
-                await self.play_url(ctx, next_url, next_title)
+                result = self.queue.pop(0)
+                await self.play_url(ctx, result)
             elif ctx.voice_client.is_playing():
                 await self.send_queue(ctx)
         await ctx.message.delete()
@@ -64,9 +62,7 @@ class Music(commands.Cog):
         if error:
             print(f"Player error: {error}")
         coro = (
-            self.play_next(ctx)
-            if not self.loop
-            else self.play_url(ctx, self.current_url, self.current_title)
+            self.play_next(ctx) if not self.loop else self.play_url(ctx, self.current)
         )
         fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
         try:
@@ -74,28 +70,26 @@ class Music(commands.Cog):
         except Exception as e:
             print(f"Error resuming playback: {e}")
 
-    async def play_url(self, ctx, url, title=""):
+    async def play_url(self, ctx, current):
         try:
-            if not isinstance(url, str) or not url:
-                raise ValueError("The provided URL is not valid.")
+            self.current = current
+            url = current["link"]
             player = await self.create_player(url)
             ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
-            self.current_url = url
-            self.current_title = title
-            await self.send_now_playing(ctx, url, title)
+            await self.send_now_playing(ctx, current)
         except Exception as e:
             await ctx.send(f"Error playing URL: {e}")
 
-    async def send_now_playing(self, ctx, url, title):
+    async def send_now_playing(self, ctx, current):
+        url = current["link"]
+        title = ellipsis(current["title"])
+        thumbnail = current["thumbnails"][0]["url"]
+        channel = current["channel"]["name"]
+        duration = current["duration"]
+
         max_title_length = 45
         if len(title) > max_title_length:
             title = title[: max_title_length - 3] + "..."
-
-        videosSearch = VideosSearch(url, limit=1)
-        result = videosSearch.result()["result"][0]
-        thumbnail = result["thumbnails"][0]["url"]
-        channel = result["channel"]["name"]
-        duration = result["duration"]
 
         play_status = "⏸️" if ctx.voice_client.is_paused() else "▶️"
         loop_status = "Y" if self.loop else "N"
@@ -123,7 +117,7 @@ class Music(commands.Cog):
             ("⏯️", discord.ButtonStyle.primary, "pause_resume"),
             ("⏭️", discord.ButtonStyle.secondary, "skip"),
             ("⏹️", discord.ButtonStyle.danger, "stop"),
-            ("🔁", discord.ButtonStyle.secondary, "toggle_loop"),
+            ("🔁", discord.ButtonStyle.secondary, "loop"),
             ("⏏️", discord.ButtonStyle.secondary, "show_queue"),
         ]
         for label, style, custom_id in buttons:
@@ -134,79 +128,30 @@ class Music(commands.Cog):
 
     async def send_queue(self, ctx):
         if not self.queue:
-            await ctx.send("Queue is empty.")
+            embed = discord.Embed(
+                description="🎶 대기열이 비어있습니다.",
+                color=discord.Color.green(),
+            )
+            await ctx.send(embed=embed, delete_after=3)
         else:
-            max_title_length = 45
+            now = ellipsis(self.current["title"])
             queue_list = "\n".join(
                 [
-                    f"{idx + 1}. {title[: max_title_length - 3] + '...' if len(title) > max_title_length else title}"
-                    for idx, (url, title) in enumerate(self.queue)
+                    f"{idx + 1}. {ellipsis(video['title'], 45)}"
+                    for idx, video in enumerate(self.queue)
                 ]
-            )
-            current = (
-                self.current_title[: max_title_length - 3] + "..."
-                if len(self.current_title) > max_title_length
-                else (
-                    self.current_title
-                    if self.current_title
-                    else "No song is currently playing."
-                )
             )
             embed = discord.Embed(
                 title="🎶 Current Queue",
-                description=f"**Now Playing:** {current}\n\n**Up Next:**\n{queue_list}",
+                description=f"**Now Playing:** {now}\n\n**Up Next:**\n{queue_list}",
                 color=discord.Color.green(),
             )
-            await ctx.send(embed=embed, delete_after=5)
+            await ctx.send(embed=embed, delete_after=3)
 
     @commands.command()
     async def volume(self, ctx, volume: int):
-        if ctx.voice_client is None:
-            return await ctx.send("Not connected to a voice channel.")
         ctx.voice_client.source.volume = volume / 100
         await ctx.send(f"Changed volume to {volume}%")
-
-    @commands.command()
-    async def stop(self, ctx):
-        if self.now_playing_message:
-            await self.now_playing_message.delete()
-            self.now_playing_message = None
-        await ctx.voice_client.disconnect()
-
-    @commands.command()
-    async def pause(self, ctx):
-        if ctx.voice_client.is_paused() or not ctx.voice_client.is_playing():
-            return await ctx.send(
-                "음악이 이미 일시 정지 중이거나 재생 중이지 않습니다."
-            )
-        ctx.voice_client.pause()
-
-    @commands.command()
-    async def resume(self, ctx):
-        if ctx.voice_client.is_playing() or not ctx.voice_client.is_paused():
-            return await ctx.send(
-                "음악이 이미 재생 중이거나 재생할 음악이 존재하지 않습니다."
-            )
-        ctx.voice_client.resume()
-
-    @commands.command()
-    async def loop(self, ctx):
-        self.loop = not self.loop
-        await ctx.send(f"Loop is now {'enabled' if self.loop else 'disabled'}.")
-
-    @commands.command()
-    async def show_queue(self, ctx):
-        await self.send_queue(ctx)
-
-    @commands.command()
-    async def skip(self, ctx):
-        if ctx.voice_client.is_playing():
-            if self.now_playing_message:
-                await self.now_playing_message.delete()
-                self.now_playing_message = None
-            ctx.voice_client.stop()
-        else:
-            await ctx.send("No song is currently playing.")
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
@@ -218,99 +163,5 @@ class Music(commands.Cog):
                 raise commands.CommandError("Author not connected to a voice channel.")
 
 
-async def handle_interaction(interaction):
-    custom_id = interaction.data["custom_id"]
-    music_cog = interaction.client.get_cog("Music")
-    ctx = await interaction.client.get_context(interaction.message)
-
-    handlers = {
-        "pause_resume": handle_pause_resume,
-        "skip": handle_skip,
-        "stop": handle_stop,
-        "toggle_loop": handle_toggle_loop,
-        "show_queue": handle_show_queue,
-    }
-
-    if custom_id in handlers:
-        await handlers[custom_id](interaction, music_cog, ctx)
-
-
-async def handle_pause_resume(interaction, music_cog, ctx):
-    if interaction.guild.voice_client.is_playing():
-        interaction.guild.voice_client.pause()
-        await music_cog.send_now_playing(
-            ctx, music_cog.current_url, music_cog.current_title
-        )
-    elif interaction.guild.voice_client.is_paused():
-        interaction.guild.voice_client.resume()
-        await music_cog.send_now_playing(
-            ctx, music_cog.current_url, music_cog.current_title
-        )
-    else:
-        await interaction.response.send_message(
-            "재생 중인 음악이 없습니다.", ephemeral=True, delete_after=3
-        )
-
-
-async def handle_skip(interaction, music_cog, ctx):
-    if interaction.guild.voice_client.is_playing():
-        if music_cog.now_playing_message:
-            await music_cog.now_playing_message.delete()
-            music_cog.now_playing_message = None
-        interaction.guild.voice_client.stop()
-    else:
-        await interaction.response.send_message(
-            "No song is currently playing.", ephemeral=True, delete_after=3
-        )
-    await music_cog.send_now_playing(
-        ctx, music_cog.current_url, music_cog.current_title
-    )
-
-
-async def handle_stop(interaction, music_cog, ctx):
-    if interaction.guild.voice_client.is_connected():
-        if music_cog.now_playing_message:
-            await music_cog.now_playing_message.delete()
-            music_cog.now_playing_message = None
-        await interaction.guild.voice_client.disconnect()
-
-
-async def handle_toggle_loop(interaction, music_cog, ctx):
-    music_cog.loop = not music_cog.loop
-    await music_cog.send_now_playing(
-        ctx, music_cog.current_url, music_cog.current_title
-    )
-
-
-async def handle_show_queue(interaction, music_cog, ctx):
-    await interaction.response.defer()
-    if not music_cog.queue:
-        await interaction.followup.send("Queue is empty.", ephemeral=True)
-    else:
-        max_title_length = 45
-        queue_list = "\n".join(
-            [
-                f"{idx + 1}. {title[: max_title_length - 3] + '...' if len(title) > max_title_length else title}"
-                for idx, (url, title) in enumerate(music_cog.queue)
-            ]
-        )
-        current = (
-            music_cog.current_title[: max_title_length - 3] + "..."
-            if len(music_cog.current_title) > max_title_length
-            else (
-                music_cog.current_title
-                if music_cog.current_title
-                else "No song is currently playing."
-            )
-        )
-        embed = discord.Embed(
-            title="🎶 Current Queue",
-            description=f"**Now Playing:** {current}\n\n**Up Next:**\n{queue_list}",
-            color=discord.Color.green(),
-        )
-        await interaction.followup.send(embed=embed, ephemeral=True)
-
-
 async def setup(bot):
     await bot.add_cog(Music(bot))
-    bot.add_listener(handle_interaction, "on_interaction")
