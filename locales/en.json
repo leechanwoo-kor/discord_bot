@@ -9,5 +9,6 @@
     "requester": "Requester",
     "loop": "Loop",
     "up_next": "Up Next",
-    "enter_keyword": "Please enter a keyword."
+    "enter_keyword": "Please enter a keyword.",
+    "search_list": "Search List"
 }

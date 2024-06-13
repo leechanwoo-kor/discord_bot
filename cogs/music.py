@@ -10,6 +10,38 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class SearchSelect(discord.ui.Select):
+    def __init__(self, results, cog, interaction):
+        self.results = results
+        self.cog = cog
+        self.interaction = interaction
+        options = [
+            discord.SelectOption(
+                label=result["title"],
+                description=result["channel"]["name"],
+                value=str(index),
+            )
+            for index, result in enumerate(results)
+        ]
+        super().__init__(
+            placeholder="노래를 선택하세요...",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        selected_index = int(self.values[0])
+        selected_result = self.results[selected_index]
+        await self.cog.play_selected(interaction, selected_result)
+
+
+class SearchView(discord.ui.View):
+    def __init__(self, results, cog, interaction):
+        super().__init__()
+        self.add_item(SearchSelect(results, cog, interaction))
+
+
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -213,6 +245,61 @@ class Music(commands.Cog):
         ctx.voice_client = ctx.guild.voice_client
         await interaction.response.defer()
         await self.play_command(ctx, keyword)
+
+    async def handle_search_command(
+        self, interaction: discord.Interaction, keyword: str
+    ):
+        locale = self.get_user_locale(interaction)
+        if not keyword:
+            await interaction.response.send_message(
+                get_translation("enter_keyword", locale)
+            )
+            return
+
+        async with interaction.channel.typing():
+            videosSearch = VideosSearch(keyword, limit=5)
+            results = videosSearch.result()["result"]
+
+            if not results:
+                await interaction.response.send_message(
+                    get_translation("no_results", locale)
+                )
+                return
+
+            await interaction.response.send_message(
+                get_translation("select_song", locale),
+                view=SearchView(results, self, interaction),
+            )
+
+    async def play_selected(self, interaction, selected_result):
+        class Context:
+            def __init__(self, interaction, selected_result):
+                self.interaction = interaction
+                self.author = interaction.user
+                self.voice_client = interaction.guild.voice_client
+                self.send = interaction.followup.send
+                self.typing = interaction.channel.typing
+                self.message = interaction.message
+                self.guild = interaction.guild
+
+        ctx = Context(interaction, selected_result)
+        locale = self.get_user_locale(ctx)
+
+        if ctx.voice_client is None:
+            if ctx.author.voice:
+                await self.join_voice_channel(ctx)
+            else:
+                message = get_translation("join_voice_channel", locale)
+                await interaction.response.send_message(message, ephemeral=True)
+                return
+
+        ctx.voice_client = ctx.guild.voice_client
+        await interaction.response.defer()
+        self.queue.append(selected_result)
+        if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
+            await self.play_url(ctx, self.queue.pop(0))
+        else:
+            await self.send_queue(ctx)
 
 
 async def setup(bot):

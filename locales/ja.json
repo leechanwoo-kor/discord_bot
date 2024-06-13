@@ -9,5 +9,6 @@
     "requester": "リクエスター",
     "loop": "ループ",
     "up_next": "次へ",
-    "enter_keyword": "キーワードを入力してください。"
+    "enter_keyword": "キーワードを入力してください。",
+    "search_list": "検索リスト"
 }

@@ -51,6 +51,17 @@ async def slash_play(interaction: discord.Interaction, keyword: str):
         )
 
 
+@bot.tree.command(name="search", description="Search for songs and select one to play!")
+async def slash_search(interaction: discord.Interaction, keyword: str):
+    music_cog = bot.get_cog("Music")
+    if music_cog:
+        await music_cog.handle_search_command(interaction, keyword)
+    else:
+        await interaction.response.send_message(
+            "음악 cog를 찾을 수 없습니다.", ephemeral=True
+        )
+
+
 async def main():
     async with bot:
         try:
