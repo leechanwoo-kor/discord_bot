@@ -267,7 +267,7 @@ class Music(commands.Cog):
                 return
 
             await interaction.response.send_message(
-                get_translation("select_song", locale),
+                get_translation("search_list", locale),
                 view=SearchView(results, self, interaction),
             )
 
