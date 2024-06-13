@@ -1,6 +1,9 @@
 import asyncio
 import discord
 from discord.ext import commands
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class InteractionHandler(commands.Cog):
@@ -8,6 +11,10 @@ class InteractionHandler(commands.Cog):
         self.bot = bot
 
     async def handle_interaction(self, interaction):
+        if "custom_id" not in interaction.data:
+            logger.error("Interaction does not contain custom_id.")
+            return
+
         custom_id = interaction.data["custom_id"]
         music_cog = interaction.client.get_cog("Music")
         ctx = await interaction.client.get_context(interaction.message)
@@ -48,7 +55,6 @@ class InteractionHandler(commands.Cog):
         music_cog.loop = not music_cog.loop
         interaction.guild.voice_client.loop = music_cog.loop
         await music_cog.send_now_playing(ctx, music_cog.current)
-
 
     async def handle_show_queue(self, interaction, music_cog, ctx):
         await interaction.response.defer()
