@@ -1,7 +1,6 @@
 import asyncio
 import discord
 from discord.ext import commands
-from discord import app_commands
 from youtubesearchpython import VideosSearch
 from utils.ytdl import YTDLSource
 from utils.utils import ellipsis, get_translation
@@ -20,8 +19,9 @@ class Music(commands.Cog):
         self.now_playing_message = None
 
     def get_user_locale(self, ctx):
+        # TODO Implement user locale
         # return self.user_locales.get(ctx.author.id, "ko")
-        return "ja"
+        return "ko"
 
     async def join_voice_channel(self, ctx):
         channel = ctx.author.voice.channel
@@ -39,7 +39,7 @@ class Music(commands.Cog):
             await self.play_url(ctx, next_item)
         else:
             locale = self.get_user_locale(ctx)
-            await ctx.send(get_translation("queue_empty", locale), delete_after=3)
+            await ctx.send(get_translation("queue_empty", locale))
 
     @commands.command()
     async def join(self, ctx):
@@ -58,7 +58,7 @@ class Music(commands.Cog):
     async def play_command(self, ctx, keyword=None):
         locale = self.get_user_locale(ctx)
         if not keyword:
-            await ctx.send(get_translation("enter_keyword", locale), delete_after=3)
+            await ctx.send(get_translation("enter_keyword", locale))
             return
 
         async with ctx.typing():
@@ -154,7 +154,7 @@ class Music(commands.Cog):
                 description=get_translation("queue_empty", locale),
                 color=discord.Color.green(),
             )
-            await ctx.send(embed=embed, delete_after=3)
+            await ctx.send(embed=embed)
         else:
             now = ellipsis(self.current["title"])
             queue_list = "\n".join(
@@ -175,9 +175,7 @@ class Music(commands.Cog):
     async def volume(self, ctx, volume: int):
         locale = self.get_user_locale(ctx)
         ctx.voice_client.source.volume = volume / 100
-        await ctx.send(
-            get_translation("volume_changed", locale, volume=volume), delete_after=3
-        )
+        await ctx.send(get_translation("volume_changed", locale, volume=volume))
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
