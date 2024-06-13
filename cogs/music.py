@@ -1,7 +1,8 @@
 import asyncio
 import discord
-from youtubesearchpython import VideosSearch
 from discord.ext import commands
+from discord import app_commands
+from youtubesearchpython import VideosSearch
 from utils.ytdl import YTDLSource
 from utils.utils import ellipsis, get_translation
 import discord.ui
@@ -48,6 +49,9 @@ class Music(commands.Cog):
 
     @commands.command(aliases=["p", "P", "ㅔ"])
     async def play(self, ctx, *, keyword=None):
+        await self.play_command(ctx, keyword)
+
+    async def play_command(self, ctx, keyword=None):
         locale = self.get_user_locale(ctx)
         if not keyword:
             await ctx.send(get_translation("enter_keyword", locale), delete_after=3)
@@ -95,7 +99,10 @@ class Music(commands.Cog):
         if self.now_playing_message:
             await self.now_playing_message.delete()
 
-        self.now_playing_message = await ctx.send(embed=embed, view=view)
+        if hasattr(ctx, "interaction"):
+            await ctx.interaction.followup.send(embed=embed, view=view)
+        else:
+            self.now_playing_message = await ctx.send(embed=embed, view=view)
 
     def create_now_playing_embed(self, ctx, current, locale):
         url = current["link"]
@@ -162,7 +169,11 @@ class Music(commands.Cog):
                 description=f"**{get_translation('playing_now', locale)}:** {now}\n\n**{get_translation('up_next', locale)}:**\n{queue_list}",
                 color=discord.Color.green(),
             )
-            await ctx.send(embed=embed, delete_after=3)
+
+            if hasattr(ctx, "interaction"):
+                await ctx.interaction.followup.send(embed=embed)
+            else:
+                self.now_playing_message = await ctx.send(embed=embed, delete_after=3)
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -180,8 +191,34 @@ class Music(commands.Cog):
                 await self.join_voice_channel(ctx)
             else:
                 message = get_translation("join_voice_channel", locale)
-                await ctx.send(message, delete_after=3)
+                await ctx.send(message, ephemeral=True)
                 raise commands.CommandError(message)
+
+    async def handle_play_command(self, interaction, keyword):
+        class Context:
+            def __init__(self, interaction, keyword):
+                self.interaction = interaction
+                self.author = interaction.user
+                self.voice_client = interaction.guild.voice_client
+                self.send = interaction.followup.send
+                self.typing = interaction.channel.typing
+                self.message = interaction.message
+                self.guild = interaction.guild
+
+        ctx = Context(interaction, keyword)
+        locale = self.get_user_locale(ctx)
+
+        if ctx.voice_client is None:
+            if ctx.author.voice:
+                await self.join_voice_channel(ctx)
+            else:
+                message = get_translation("join_voice_channel", locale)
+                await interaction.response.send_message(message, ephemeral=True)
+                return
+
+        ctx.voice_client = ctx.guild.voice_client
+        await interaction.response.defer()
+        await self.play_command(ctx, keyword)
 
 
 async def setup(bot):
