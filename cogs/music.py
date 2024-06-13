@@ -6,6 +6,9 @@ from youtubesearchpython import VideosSearch
 from utils.ytdl import YTDLSource
 from utils.utils import ellipsis, get_translation
 import discord.ui
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Music(commands.Cog):
@@ -23,8 +26,9 @@ class Music(commands.Cog):
     async def join_voice_channel(self, ctx):
         channel = ctx.author.voice.channel
         if ctx.voice_client is not None:
-            return await ctx.voice_client.move_to(channel)
-        await channel.connect()
+            await ctx.voice_client.move_to(channel)
+        else:
+            await channel.connect()
 
     async def create_player(self, url):
         return await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
@@ -55,7 +59,6 @@ class Music(commands.Cog):
         locale = self.get_user_locale(ctx)
         if not keyword:
             await ctx.send(get_translation("enter_keyword", locale), delete_after=3)
-            await ctx.message.delete()
             return
 
         async with ctx.typing():
@@ -67,7 +70,6 @@ class Music(commands.Cog):
                 await self.play_url(ctx, self.queue.pop(0))
             else:
                 await self.send_queue(ctx)
-        await ctx.message.delete()
 
     def after_play(self, ctx, error):
         if error:
@@ -99,10 +101,7 @@ class Music(commands.Cog):
         if self.now_playing_message:
             await self.now_playing_message.delete()
 
-        if hasattr(ctx, "interaction"):
-            await ctx.interaction.followup.send(embed=embed, view=view)
-        else:
-            self.now_playing_message = await ctx.send(embed=embed, view=view)
+        self.now_playing_message = await ctx.send(embed=embed, view=view)
 
     def create_now_playing_embed(self, ctx, current, locale):
         url = current["link"]
@@ -170,10 +169,7 @@ class Music(commands.Cog):
                 color=discord.Color.green(),
             )
 
-            if hasattr(ctx, "interaction"):
-                await ctx.interaction.followup.send(embed=embed)
-            else:
-                self.now_playing_message = await ctx.send(embed=embed, delete_after=3)
+            self.now_playing_message = await ctx.send(embed=embed)
 
     @commands.command()
     async def volume(self, ctx, volume: int):
