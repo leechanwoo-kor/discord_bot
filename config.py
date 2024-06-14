@@ -1,1 +1,2 @@
-Token="<insert your token here>"
+TOKEN="<YOUR_BOT_TOKEN>"
+APPLICATION_ID="<YOUR_APPLICATION_ID>"
