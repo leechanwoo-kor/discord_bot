@@ -24,7 +24,7 @@ class SearchSelect(discord.ui.Select):
             for index, result in enumerate(results)
         ]
         super().__init__(
-            placeholder="노래를 선택하세요...",
+            placeholder="Choose a song...",
             min_values=1,
             max_values=1,
             options=options,

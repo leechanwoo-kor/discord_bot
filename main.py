@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 bot = commands.Bot(
     command_prefix=commands.when_mentioned_or("!"),
-    description="Relatively simple music bot example",
+    description="Playground: Bot",
     intents=intents,
     application_id=APPLICATION_ID,
 )
