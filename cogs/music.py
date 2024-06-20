@@ -130,10 +130,15 @@ class Music(commands.Cog):
         embed = self.create_now_playing_embed(ctx, current, locale)
         view = self.create_view()
 
-        if self.now_playing_message:
-            await self.now_playing_message.delete()
+        now = await ctx.send(embed=embed, view=view)
 
-        self.now_playing_message = await ctx.send(embed=embed, view=view)
+        try:
+            if self.now_playing_message:
+                await self.now_playing_message.delete()
+        except discord.errors.HTTPException as e:
+            logger.error(f"이전 메시지 삭제 실패: {e}")
+
+        self.now_playing_message = now
 
     def create_now_playing_embed(self, ctx, current, locale):
         url = current["link"]
