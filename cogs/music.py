@@ -82,6 +82,12 @@ class Music(commands.Cog):
             message = get_translation("join_voice_channel", locale)
             await ctx.send(message)
             raise commands.CommandError(message)
+    
+    @commands.command()
+    async def reset(self, ctx):
+        self.__init__(self.bot)
+        await ctx.send("Reset complete.")
+        await ctx.voice_client.disconnect()
 
     @commands.command(aliases=["p", "P", "ㅔ"])
     async def play(self, ctx, *, keyword=None):
