@@ -1,13 +1,19 @@
 import asyncio
+import logging
+from typing import List, Optional
+
 import discord
 from discord.ext import commands
 from youtubesearchpython import VideosSearch
+
 from utils.ytdl import YTDLSource
 from utils.utils import ellipsis, get_translation
-import discord.ui
-import logging
 
 logger = logging.getLogger(__name__)
+
+
+class QueueFullError(Exception):
+    pass
 
 
 class SearchSelect(discord.ui.Select):
@@ -50,22 +56,24 @@ class Music(commands.Cog):
         self.queue = []
         self.now_playing_message = None
 
-    def get_user_locale(self, ctx):
-        # TODO Implement user locale
-        # return self.user_locales.get(ctx.author.id, "ko")
+    def get_user_locale(self, ctx: commands.Context) -> str:
+        # TODO: Implement user locale detection
         return "ko"
 
-    async def join_voice_channel(self, ctx):
+    async def join_voice_channel(self, ctx: commands.Context) -> None:
+        if not ctx.author.voice:
+            raise commands.CommandError(get_translation("join_voice_channel", self.get_user_locale(ctx)))
+        
         channel = ctx.author.voice.channel
-        if ctx.voice_client is not None:
+        if ctx.voice_client:
             await ctx.voice_client.move_to(channel)
         else:
             await channel.connect()
 
-    async def create_player(self, url):
+    async def create_player(self, url: str) -> YTDLSource:
         return await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
 
-    async def play_next(self, ctx):
+    async def play_next(self, ctx: commands.Context) -> None:
         if self.queue:
             next_item = self.queue.pop(0)
             await self.play_url(ctx, next_item)
@@ -82,7 +90,7 @@ class Music(commands.Cog):
             message = get_translation("join_voice_channel", locale)
             await ctx.send(message)
             raise commands.CommandError(message)
-    
+
     @commands.command()
     async def reset(self, ctx):
         self.__init__(self.bot)
@@ -90,10 +98,10 @@ class Music(commands.Cog):
         await ctx.voice_client.disconnect()
 
     @commands.command(aliases=["p", "P", "ㅔ"])
-    async def play(self, ctx, *, keyword=None):
+    async def play(self, ctx: commands.Context, *, keyword: Optional[str] = None) -> None:
         await self.play_command(ctx, keyword)
 
-    async def play_command(self, ctx, keyword=None):
+    async def play_command(self, ctx: commands.Context, keyword: Optional[str] = None) -> None:
         locale = self.get_user_locale(ctx)
         if not keyword:
             await ctx.send(get_translation("enter_keyword", locale))
@@ -313,5 +321,5 @@ class Music(commands.Cog):
             await self.send_queue(ctx)
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Music(bot))
