@@ -4,6 +4,7 @@ from typing import List, Optional
 
 import discord
 from discord.ext import commands
+from discord.ui import View, Button
 from youtubesearchpython import VideosSearch
 
 from utils.ytdl import YTDLSource
@@ -208,19 +209,45 @@ class Music(commands.Cog):
             await ctx.send(embed=embed)
         else:
             now = ellipsis(self.current["title"])
-            queue_list = "\n".join(
-                [
-                    f"{idx + 1}. {ellipsis(video['title'], 45)}"
-                    for idx, video in enumerate(self.queue)
-                ]
-            )
+            queue_list = ""
+            view = View()
+            
+            for idx, video in enumerate(self.queue):
+                title = ellipsis(video['title'], 45)
+                queue_list += f"{idx + 1}. {title}\n"
+                
+                button = Button(label=f"{idx + 1}", style=discord.ButtonStyle.secondary, custom_id=f"play_{idx}")
+                button.callback = self.queue_button_callback
+                view.add_item(button)
+            
             embed = discord.Embed(
                 title=get_translation("current_queue", locale),
                 description=f"**{get_translation('playing_now', locale)}:** {now}\n\n**{get_translation('up_next', locale)}:**\n{queue_list}",
                 color=discord.Color.green(),
             )
 
-            self.now_playing_message = await ctx.send(embed=embed)
+            self.now_playing_message = await ctx.send(embed=embed, view=view)
+
+    async def queue_button_callback(self, interaction: discord.Interaction):
+        custom_id = interaction.data.get('custom_id', '')
+        if custom_id.startswith('play_'):
+            index = int(custom_id.split('_')[1])
+            if index < len(self.queue):
+                selected_song = self.queue.pop(index)
+                
+                # 현재 재생 중인 노래 중지
+                if interaction.guild.voice_client.is_playing():
+                    interaction.guild.voice_client.stop()
+                
+                # 선택한 노래를 현재 재생 목록에 추가
+                self.queue.insert(0, selected_song)
+                
+                # 새로운 노래 재생 시작
+                await self.play_next(await self.bot.get_context(interaction))
+            else:
+                await interaction.response.send_message("Invalid song selection.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Error processing button click.", ephemeral=True)
 
     @commands.command()
     async def volume(self, ctx, volume: int):

@@ -11,11 +11,11 @@ class InteractionHandler(commands.Cog):
         self.bot = bot
 
     async def handle_interaction(self, interaction):
-        if "custom_id" not in interaction.data:
+        custom_id = interaction.data.get("custom_id")
+        if not custom_id:
             logger.error("Interaction does not contain custom_id.")
             return
 
-        custom_id = interaction.data["custom_id"]
         music_cog = interaction.client.get_cog("Music")
         ctx = await interaction.client.get_context(interaction.message)
 
