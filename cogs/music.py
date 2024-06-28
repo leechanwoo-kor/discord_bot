@@ -347,6 +347,20 @@ class Music(commands.Cog):
         else:
             await self.send_queue(ctx)
 
+    async def show_now_playing(self, interaction: discord.Interaction):
+        ctx = await self.bot.get_context(interaction)
+        locale = self.get_user_locale(ctx)
+        if self.current:
+            embed = self.create_now_playing_embed(ctx, self.current, locale)
+            view = self.create_view()
+            await interaction.response.send_message(embed=embed, view=view)
+        else:
+            if self.queue:
+                next_song = self.queue[0]['title']
+                message = f"No song is currently playing. Next up: {next_song}"
+            else:
+                message = "No song is currently playing and the queue is empty."
+            await interaction.response.send_message(message, ephemeral=True)
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Music(bot))
