@@ -11,24 +11,28 @@ class InteractionHandler(commands.Cog):
         self.bot = bot
 
     async def handle_interaction(self, interaction):
-        custom_id = interaction.data.get("custom_id")
-        if not custom_id:
-            logger.error("Interaction does not contain custom_id.")
-            return
+        if interaction.type == discord.InteractionType.component:
+            custom_id = interaction.data.get("custom_id")
+            if not custom_id:
+                logger.error("Component interaction does not contain custom_id.")
+                return
 
-        music_cog = interaction.client.get_cog("Music")
-        ctx = await interaction.client.get_context(interaction.message)
+            music_cog = interaction.client.get_cog("Music")
+            ctx = await interaction.client.get_context(interaction.message)
 
-        handlers = {
-            "pause_resume": self.handle_pause_resume,
-            "skip": self.handle_skip,
-            "stop": self.handle_stop,
-            "loop": self.handle_loop,
-            "show_queue": self.handle_show_queue,
-        }
+            handlers = {
+                "pause_resume": self.handle_pause_resume,
+                "skip": self.handle_skip,
+                "stop": self.handle_stop,
+                "loop": self.handle_loop,
+                "show_queue": self.handle_show_queue,
+            }
 
-        if custom_id in handlers:
-            await handlers[custom_id](interaction, music_cog, ctx)
+            if custom_id in handlers:
+                await handlers[custom_id](interaction, music_cog, ctx)
+        else:
+            # Handle other types of interactions if needed
+            pass
 
     async def handle_pause_resume(self, interaction, music_cog, ctx):
         if interaction.guild.voice_client.is_playing():
