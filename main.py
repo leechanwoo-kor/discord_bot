@@ -81,6 +81,14 @@ async def slash_now(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("Music cog not found.", ephemeral=True)
 
+@bot.tree.command(name="clear", description="Clear the current music queue")
+async def slash_clear(interaction: discord.Interaction):
+    music_cog: Music = bot.get_cog("Music")
+    if music_cog:
+        await music_cog.clear(interaction)
+    else:
+        await interaction.response.send_message("Music cog not found.", ephemeral=True)
+
 
 async def main():
     async with bot:

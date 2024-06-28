@@ -63,8 +63,10 @@ class Music(commands.Cog):
 
     async def join_voice_channel(self, ctx: commands.Context) -> None:
         if not ctx.author.voice:
-            raise commands.CommandError(get_translation("join_voice_channel", self.get_user_locale(ctx)))
-        
+            raise commands.CommandError(
+                get_translation("join_voice_channel", self.get_user_locale(ctx))
+            )
+
         channel = ctx.author.voice.channel
         if ctx.voice_client:
             await ctx.voice_client.move_to(channel)
@@ -99,10 +101,14 @@ class Music(commands.Cog):
         await ctx.voice_client.disconnect()
 
     @commands.command(aliases=["p", "P", "ㅔ"])
-    async def play(self, ctx: commands.Context, *, keyword: Optional[str] = None) -> None:
+    async def play(
+        self, ctx: commands.Context, *, keyword: Optional[str] = None
+    ) -> None:
         await self.play_command(ctx, keyword)
 
-    async def play_command(self, ctx: commands.Context, keyword: Optional[str] = None) -> None:
+    async def play_command(
+        self, ctx: commands.Context, keyword: Optional[str] = None
+    ) -> None:
         locale = self.get_user_locale(ctx)
         if not keyword:
             await ctx.send(get_translation("enter_keyword", locale))
@@ -211,15 +217,19 @@ class Music(commands.Cog):
             now = ellipsis(self.current["title"])
             queue_list = ""
             view = View()
-            
+
             for idx, video in enumerate(self.queue):
-                title = ellipsis(video['title'], 45)
+                title = ellipsis(video["title"], 45)
                 queue_list += f"{idx + 1}. {title}\n"
-                
-                button = Button(label=f"{idx + 1}", style=discord.ButtonStyle.secondary, custom_id=f"play_{idx}")
+
+                button = Button(
+                    label=f"{idx + 1}",
+                    style=discord.ButtonStyle.secondary,
+                    custom_id=f"play_{idx}",
+                )
                 button.callback = self.queue_button_callback
                 view.add_item(button)
-            
+
             embed = discord.Embed(
                 title=get_translation("current_queue", locale),
                 description=f"**{get_translation('playing_now', locale)}:** {now}\n\n**{get_translation('up_next', locale)}:**\n{queue_list}",
@@ -229,25 +239,29 @@ class Music(commands.Cog):
             self.now_playing_message = await ctx.send(embed=embed, view=view)
 
     async def queue_button_callback(self, interaction: discord.Interaction):
-        custom_id = interaction.data.get('custom_id', '')
-        if custom_id.startswith('play_'):
-            index = int(custom_id.split('_')[1])
+        custom_id = interaction.data.get("custom_id", "")
+        if custom_id.startswith("play_"):
+            index = int(custom_id.split("_")[1])
             if index < len(self.queue):
                 selected_song = self.queue.pop(index)
-                
+
                 # 현재 재생 중인 노래 중지
                 if interaction.guild.voice_client.is_playing():
                     interaction.guild.voice_client.stop()
-                
+
                 # 선택한 노래를 현재 재생 목록에 추가
                 self.queue.insert(0, selected_song)
-                
+
                 # 새로운 노래 재생 시작
                 await self.play_next(await self.bot.get_context(interaction))
             else:
-                await interaction.response.send_message("Invalid song selection.", ephemeral=True)
+                await interaction.response.send_message(
+                    "Invalid song selection.", ephemeral=True
+                )
         else:
-            await interaction.response.send_message("Error processing button click.", ephemeral=True)
+            await interaction.response.send_message(
+                "Error processing button click.", ephemeral=True
+            )
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -356,11 +370,22 @@ class Music(commands.Cog):
             await interaction.response.send_message(embed=embed, view=view)
         else:
             if self.queue:
-                next_song = self.queue[0]['title']
+                next_song = self.queue[0]["title"]
                 message = f"No song is currently playing. Next up: {next_song}"
             else:
                 message = "No song is currently playing and the queue is empty."
             await interaction.response.send_message(message, ephemeral=True)
+
+    async def clear(self, interaction: discord.Interaction):
+        locale = self.get_user_locale(interaction)
+        if not self.queue:
+            await interaction.response.send_message(
+                "대기열이 이미 비어있습니다.", ephemeral=True
+            )
+        else:
+            self.queue.clear()
+            await interaction.response.send_message("대기열이 초기화되었습니다.")
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Music(bot))
