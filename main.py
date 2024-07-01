@@ -38,56 +38,12 @@ class PlaygroundBot(commands.Bot):
 
     async def on_ready(self):
         logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
-        logger.info("------")
-        await self.sync_commands()
-
-    async def sync_commands(self):
-        try:
-            logger.info("Attempting to sync commands...")
-            synced: List[app_commands.Command] = await self.tree.sync()
-            logger.info(f"Slash Commands synced: {len(synced)} commands")
-            for command in synced:
-                logger.info(f"Synced command: {command.name}")
-            logger.info("Slash Commands synced successfully!")
-        except Exception as e:
-            logger.error(f"Unexpected error while syncing commands: {e}")
+        logger.info("--------------------------------")
+        await self.tree.sync()
+        logger.info("Commands synced successfully!")
 
 
 bot = PlaygroundBot()
-
-
-@bot.tree.command(name="play", description="Play a song with given keyword!")
-async def slash_play(interaction: discord.Interaction, keyword: str):
-    music_cog: Music = bot.get_cog("Music")
-    if music_cog:
-        await music_cog.handle_play_command(interaction, keyword)
-    else:
-        await interaction.response.send_message("Music cog not found.", ephemeral=True)
-
-
-@bot.tree.command(name="search", description="Search for songs and select one to play!")
-async def slash_search(interaction: discord.Interaction, keyword: str):
-    music_cog: Music = bot.get_cog("Music")
-    if music_cog:
-        await music_cog.handle_search_command(interaction, keyword)
-    else:
-        await interaction.response.send_message("Music cog not found.", ephemeral=True)
-
-@bot.tree.command(name="now", description="Show the currently playing song!")
-async def slash_now(interaction: discord.Interaction):
-    music_cog: Music = bot.get_cog("Music")
-    if music_cog:
-        await music_cog.show_now_playing(interaction)
-    else:
-        await interaction.response.send_message("Music cog not found.", ephemeral=True)
-
-@bot.tree.command(name="clear", description="Clear the current music queue")
-async def slash_clear(interaction: discord.Interaction):
-    music_cog: Music = bot.get_cog("Music")
-    if music_cog:
-        await music_cog.clear(interaction)
-    else:
-        await interaction.response.send_message("Music cog not found.", ephemeral=True)
 
 
 async def main():

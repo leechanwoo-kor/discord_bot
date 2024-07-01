@@ -4,11 +4,12 @@ from typing import List, Optional
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 from discord.ui import View, Button
 from youtubesearchpython import VideosSearch
 
-from utils.ytdl import YTDLSource
 from utils.utils import ellipsis, get_translation
+from utils.ytdl import YTDLSource
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,23 @@ class Music(commands.Cog):
         self.current = None
         self.queue = []
         self.now_playing_message = None
+        self.search_manager = SearchManager()
+
+    @app_commands.command(name="play", description="Play a song with given keyword!")
+    async def slash_play(self, interaction: discord.Interaction, keyword: str):
+        await self.handle_play_command(interaction, keyword)
+
+    @app_commands.command(name="search", description="Search for songs and select one to play!")
+    async def slash_search(self, interaction: discord.Interaction, keyword: str):
+        await self.handle_search_command(interaction, keyword)
+
+    @app_commands.command(name="now", description="Show the currently playing song!")
+    async def slash_now(self, interaction: discord.Interaction):
+        await self.show_now_playing(interaction)
+
+    @app_commands.command(name="clear", description="Clear the current music queue")
+    async def slash_clear(self, interaction: discord.Interaction):
+        await self.clear(interaction)
 
     def get_user_locale(self, ctx: commands.Context) -> str:
         # TODO: Implement user locale detection
@@ -389,3 +407,15 @@ class Music(commands.Cog):
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Music(bot))
+
+
+class SearchManager:
+    async def search(self, keyword):
+        videosSearch = VideosSearch(keyword, limit=1)
+        result = videosSearch.result()["result"][0]
+        return result
+
+    async def search_multiple(self, keyword, limit=5):
+        videosSearch = VideosSearch(keyword, limit=limit)
+        results = videosSearch.result()["result"]
+        return results
