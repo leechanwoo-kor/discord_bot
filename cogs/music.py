@@ -14,42 +14,6 @@ from utils.ytdl import YTDLSource
 logger = logging.getLogger(__name__)
 
 
-class QueueFullError(Exception):
-    pass
-
-
-class SearchSelect(discord.ui.Select):
-    def __init__(self, results, cog, interaction):
-        self.results = results
-        self.cog = cog
-        self.interaction = interaction
-        options = [
-            discord.SelectOption(
-                label=result["title"],
-                description=result["channel"]["name"],
-                value=str(index),
-            )
-            for index, result in enumerate(results)
-        ]
-        super().__init__(
-            placeholder="Choose a song...",
-            min_values=1,
-            max_values=1,
-            options=options,
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        selected_index = int(self.values[0])
-        selected_result = self.results[selected_index]
-        await self.cog.play_selected(interaction, selected_result)
-
-
-class SearchView(discord.ui.View):
-    def __init__(self, results, cog, interaction):
-        super().__init__()
-        self.add_item(SearchSelect(results, cog, interaction))
-
-
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -57,27 +21,26 @@ class Music(commands.Cog):
         self.current = None
         self.queue = []
         self.now_playing_message = None
-        self.search_manager = SearchManager()
 
-    @app_commands.command(name="play", description="Play a song with given keyword!")
+    def get_user_locale(self, ctx: commands.Context) -> str:
+        # TODO: Implement user locale detection
+        return "ko"
+
+    @app_commands.command(name="play", description="Play a song with given keyword")
     async def slash_play(self, interaction: discord.Interaction, keyword: str):
         await self.handle_play_command(interaction, keyword)
 
-    @app_commands.command(name="search", description="Search for songs and select one to play!")
+    @app_commands.command(name="search", description="Search songs with given keyword")
     async def slash_search(self, interaction: discord.Interaction, keyword: str):
         await self.handle_search_command(interaction, keyword)
 
-    @app_commands.command(name="now", description="Show the currently playing song!")
+    @app_commands.command(name="now", description="Show the currently playing song")
     async def slash_now(self, interaction: discord.Interaction):
         await self.show_now_playing(interaction)
 
     @app_commands.command(name="clear", description="Clear the current music queue")
     async def slash_clear(self, interaction: discord.Interaction):
         await self.clear(interaction)
-
-    def get_user_locale(self, ctx: commands.Context) -> str:
-        # TODO: Implement user locale detection
-        return "ko"
 
     async def join_voice_channel(self, ctx: commands.Context) -> None:
         if not ctx.author.voice:
@@ -409,13 +372,33 @@ async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Music(bot))
 
 
-class SearchManager:
-    async def search(self, keyword):
-        videosSearch = VideosSearch(keyword, limit=1)
-        result = videosSearch.result()["result"][0]
-        return result
+class SearchSelect(discord.ui.Select):
+    def __init__(self, results, cog, interaction):
+        self.results = results
+        self.cog = cog
+        self.interaction = interaction
+        options = [
+            discord.SelectOption(
+                label=result["title"],
+                description=result["channel"]["name"],
+                value=str(index),
+            )
+            for index, result in enumerate(results)
+        ]
+        super().__init__(
+            placeholder="Choose a song...",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
 
-    async def search_multiple(self, keyword, limit=5):
-        videosSearch = VideosSearch(keyword, limit=limit)
-        results = videosSearch.result()["result"]
-        return results
+    async def callback(self, interaction: discord.Interaction):
+        selected_index = int(self.values[0])
+        selected_result = self.results[selected_index]
+        await self.cog.play_selected(interaction, selected_result)
+
+
+class SearchView(discord.ui.View):
+    def __init__(self, results, cog, interaction):
+        super().__init__()
+        self.add_item(SearchSelect(results, cog, interaction))

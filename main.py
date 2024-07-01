@@ -1,15 +1,11 @@
 import sys
 import asyncio
 import logging
-from typing import List
 
 import discord
 from discord.ext import commands
-from discord import app_commands
 
 from config import TOKEN, APPLICATION_ID, COMMAND_PREFIX
-from cogs.music import Music
-from cogs.interactions import InteractionHandler
 
 sys.path.append(".")
 
