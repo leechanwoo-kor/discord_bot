@@ -66,16 +66,6 @@ class Music(commands.Cog):
             await ctx.send(get_translation("queue_empty", locale))
 
     @commands.command()
-    async def join(self, ctx):
-        locale = self.get_user_locale(ctx)
-        if ctx.author.voice:
-            await self.join_voice_channel(ctx)
-        else:
-            message = get_translation("join_voice_channel", locale)
-            await ctx.send(message)
-            raise commands.CommandError(message)
-
-    @commands.command()
     async def reset(self, ctx):
         self.__init__(self.bot)
         await ctx.send("Reset complete.")
