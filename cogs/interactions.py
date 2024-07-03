@@ -42,11 +42,15 @@ class InteractionHandler(commands.Cog):
         await music_cog.send_now_playing(ctx, music_cog.current)
 
     async def handle_skip(self, interaction, music_cog, ctx):
-        if music_cog.now_playing_message:
-            await music_cog.now_playing_message.delete()
+        try:
+            if music_cog.now_playing_message:
+                await music_cog.now_playing_message.delete()
             music_cog.now_playing_message = None
-        interaction.guild.voice_client.stop()
-        await music_cog.send_now_playing(ctx, music_cog.current)
+            if ctx.voice_client and ctx.voice_client.is_playing():
+                ctx.voice_client.stop()
+        except Exception as e:
+            logger.error(f"Error in handle_skip: {e}")
+            await interaction.response.send_message("An error occurred while trying to skip the song.", ephemeral=True)
 
     async def handle_stop(self, interaction, music_cog, ctx):
         # if interaction.guild.voice_client.is_connected():

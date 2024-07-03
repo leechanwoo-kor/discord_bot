@@ -57,14 +57,6 @@ class Music(commands.Cog):
     async def create_player(self, url: str) -> YTDLSource:
         return await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
 
-    async def play_next(self, ctx: commands.Context) -> None:
-        if self.queue:
-            next_item = self.queue.pop(0)
-            await self.play_url(ctx, next_item)
-        else:
-            locale = self.get_user_locale(ctx)
-            await ctx.send(get_translation("queue_empty", locale))
-
     @commands.command()
     async def reset(self, ctx):
         self.__init__(self.bot)
@@ -95,26 +87,41 @@ class Music(commands.Cog):
             else:
                 await self.send_queue(ctx)
 
+    async def play_next(self, ctx: commands.Context) -> None:
+        try:
+            if self.queue:
+                next_item = self.queue.pop(0)
+                await self.play_url(ctx, next_item)
+            elif self.loop and self.current:
+                await self.play_url(ctx, self.current)
+            else:
+                self.current = None
+                locale = self.get_user_locale(ctx)
+                await ctx.send(get_translation("queue_empty", locale))
+        except Exception as e:
+            logger.error(f"Error in play_next: {e}")
+            await ctx.send("An error occurred while trying to play the next song.")
+
     def after_play(self, ctx, error):
         if error:
-            print(f"Player error: {error}")
-        coro = (
-            self.play_next(ctx) if not self.loop else self.play_url(ctx, self.current)
-        )
+            logger.error(f"Player error: {error}")
+        coro = self.play_next(ctx)
         fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
         try:
             fut.result()
         except Exception as e:
-            print(f"Error resuming playback: {e}")
+            logger.error(f"Error resuming playback: {e}")
 
     async def play_url(self, ctx, current):
         try:
             self.current = current
             url = current["link"]
             player = await self.create_player(url)
-            ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
+            if ctx.voice_client:
+                ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
             await self.send_now_playing(ctx, current)
         except Exception as e:
+            logger.error(f"Error playing URL: {e}")
             await ctx.send(f"Error playing URL: {e}")
 
     async def send_now_playing(self, ctx, current):
