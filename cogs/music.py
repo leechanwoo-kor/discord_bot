@@ -88,19 +88,15 @@ class Music(commands.Cog):
                 await self.send_queue(ctx)
 
     async def play_next(self, ctx: commands.Context) -> None:
-        try:
-            if self.queue:
-                next_item = self.queue.pop(0)
-                await self.play_url(ctx, next_item)
-            elif self.loop and self.current:
-                await self.play_url(ctx, self.current)
-            else:
-                self.current = None
-                locale = self.get_user_locale(ctx)
-                await ctx.send(get_translation("queue_empty", locale))
-        except Exception as e:
-            logger.error(f"Error in play_next: {e}")
-            await ctx.send("An error occurred while trying to play the next song.")
+        if self.queue:
+            next_item = self.queue.pop(0)
+            await self.play_url(ctx, next_item)
+        elif self.loop and self.current:
+            await self.play_url(ctx, self.current)
+        else:
+            self.current = None
+            locale = self.get_user_locale(ctx)
+            await ctx.send(get_translation("queue_empty", locale))
 
     def after_play(self, ctx, error):
         if error:
@@ -117,8 +113,7 @@ class Music(commands.Cog):
             self.current = current
             url = current["link"]
             player = await self.create_player(url)
-            if ctx.voice_client:
-                ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
+            ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
             await self.send_now_playing(ctx, current)
         except Exception as e:
             logger.error(f"Error playing URL: {e}")
