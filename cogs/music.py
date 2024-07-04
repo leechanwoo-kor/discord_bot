@@ -120,19 +120,25 @@ class Music(commands.Cog):
             await ctx.send(f"Error playing URL: {e}")
 
     async def send_now_playing(self, ctx, current):
-        locale = self.get_user_locale(ctx)
-        embed = self.create_now_playing_embed(ctx, current, locale)
-        view = self.create_view()
-
-        now = await ctx.send(embed=embed, view=view)
-
         try:
-            if self.now_playing_message:
-                await self.now_playing_message.delete()
-        except discord.errors.HTTPException as e:
-            logger.error(f"이전 메시지 삭제 실패: {e}")
+            locale = self.get_user_locale(ctx)
+            embed = self.create_now_playing_embed(ctx, current, locale)
+            view = self.create_view()
 
-        self.now_playing_message = now
+            now = await ctx.send(embed=embed, view=view)
+
+            if self.now_playing_message:
+                try:
+                    await self.now_playing_message.delete()
+                except discord.errors.NotFound:
+                    logger.warning("Could not delete previous now playing message. It may have been already deleted.")
+                except discord.errors.HTTPException as e:
+                    logger.error(f"Failed to delete previous message: {e}")
+
+            self.now_playing_message = now
+        except Exception as e:
+            logger.error(f"Error sending now playing message: {e}")
+            await ctx.send("An error occurred while trying to display the now playing message.")
 
     def create_now_playing_embed(self, ctx, current, locale):
         url = current["link"]
@@ -361,7 +367,12 @@ class Music(commands.Cog):
 
 
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(Music(bot))
+    try:
+        await bot.add_cog(Music(bot))
+        logger.info("Music cog loaded successfully")
+    except Exception as e:
+        logger.error(f"Failed to load Music cog: {e}")
+        raise
 
 
 class SearchSelect(discord.ui.Select):
