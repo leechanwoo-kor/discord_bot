@@ -1,6 +1,3 @@
-`pip install discord.py yt-dlp PyNaCl`
-
-
 ### FFMPEG
 https://ffmpeg.org/
 
