@@ -22,10 +22,14 @@ class Music(commands.Cog):
         self.queue = []
         self.now_playing_message = None
 
+    async def create_player(self, url: str) -> YTDLSource:
+        return await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+
     def get_user_locale(self, ctx: commands.Context) -> str:
         # TODO: Implement user locale detection
         return "ko"
 
+    # Command handlers
     @app_commands.command(name="play", description="Play a song with given keyword")
     async def slash_play(self, interaction: discord.Interaction, keyword: str):
         await self.handle_play_command(interaction, keyword)
@@ -42,6 +46,7 @@ class Music(commands.Cog):
     async def slash_clear(self, interaction: discord.Interaction):
         await self.clear(interaction)
 
+    # Helper methods
     async def join_voice_channel(self, ctx: commands.Context) -> None:
         if not ctx.author.voice:
             raise commands.CommandError(
@@ -54,8 +59,53 @@ class Music(commands.Cog):
         else:
             await channel.connect()
 
-    async def create_player(self, url: str) -> YTDLSource:
-        return await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+    async def play_next(self, ctx: commands.Context) -> None:
+        if self.queue:
+            next_item = self.queue.pop(0)
+            await self.play_url(ctx, next_item)
+        elif self.loop and self.current:
+            await self.play_url(ctx, self.current)
+        else:
+            self.current = None
+            locale = self.get_user_locale(ctx)
+            await ctx.send(get_translation("queue_empty", locale))
+
+    async def play_url(self, ctx, current):
+        try:
+            self.current = current
+            url = current["link"]
+            player = await self.create_player(url)
+            ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
+            await self.send_now_playing(ctx, current)
+        except Exception as e:
+            logger.error(f"Error playing URL: {e}")
+            await ctx.send(f"Error playing URL: {e}")
+
+    async def send_now_playing(self, ctx, current):
+        try:
+            locale = self.get_user_locale(ctx)
+            embed = self.create_now_playing_embed(ctx, current, locale)
+            view = self.create_view()
+
+            now = await ctx.send(embed=embed, view=view)
+
+            if self.now_playing_message:
+                await self.delete_previous_now_playing_message()
+
+            self.now_playing_message = now
+        except Exception as e:
+            logger.error(f"Error sending now playing message: {e}")
+            await ctx.send(
+                "An error occurred while trying to display the now playing message."
+            )
+
+    async def delete_previous_now_playing_message(self):
+        try:
+            await self.now_playing_message.delete()
+        except discord.errors.NotFound:
+            logger.warning("Could not delete previous now playing message. It may have been already deleted.")
+        except discord.errors.HTTPException as e:
+            logger.error(f"Failed to delete previous message: {e}")
 
     @commands.command()
     async def reset(self, ctx):
@@ -87,17 +137,6 @@ class Music(commands.Cog):
             else:
                 await self.send_queue(ctx)
 
-    async def play_next(self, ctx: commands.Context) -> None:
-        if self.queue:
-            next_item = self.queue.pop(0)
-            await self.play_url(ctx, next_item)
-        elif self.loop and self.current:
-            await self.play_url(ctx, self.current)
-        else:
-            self.current = None
-            locale = self.get_user_locale(ctx)
-            await ctx.send(get_translation("queue_empty", locale))
-
     def after_play(self, ctx, error):
         if error:
             logger.error(f"Player error: {error}")
@@ -107,38 +146,6 @@ class Music(commands.Cog):
             fut.result()
         except Exception as e:
             logger.error(f"Error resuming playback: {e}")
-
-    async def play_url(self, ctx, current):
-        try:
-            self.current = current
-            url = current["link"]
-            player = await self.create_player(url)
-            ctx.voice_client.play(player, after=lambda e: self.after_play(ctx, e))
-            await self.send_now_playing(ctx, current)
-        except Exception as e:
-            logger.error(f"Error playing URL: {e}")
-            await ctx.send(f"Error playing URL: {e}")
-
-    async def send_now_playing(self, ctx, current):
-        try:
-            locale = self.get_user_locale(ctx)
-            embed = self.create_now_playing_embed(ctx, current, locale)
-            view = self.create_view()
-
-            now = await ctx.send(embed=embed, view=view)
-
-            if self.now_playing_message:
-                try:
-                    await self.now_playing_message.delete()
-                except discord.errors.NotFound:
-                    logger.warning("Could not delete previous now playing message. It may have been already deleted.")
-                except discord.errors.HTTPException as e:
-                    logger.error(f"Failed to delete previous message: {e}")
-
-            self.now_playing_message = now
-        except Exception as e:
-            logger.error(f"Error sending now playing message: {e}")
-            await ctx.send("An error occurred while trying to display the now playing message.")
 
     def create_now_playing_embed(self, ctx, current, locale):
         url = current["link"]
@@ -364,6 +371,21 @@ class Music(commands.Cog):
         else:
             self.queue.clear()
             await interaction.response.send_message("대기열이 초기화되었습니다.")
+
+            
+
+    # Error handling
+    async def cog_command_error(self, ctx: commands.Context, error: Exception):
+        if isinstance(error, commands.CommandInvokeError):
+            error = error.original
+
+        if isinstance(error, discord.errors.Forbidden):
+            await ctx.send("I don't have the required permissions to do that.")
+        elif isinstance(error, commands.CommandError):
+            await ctx.send(str(error))
+        else:
+            logger.error(f"An error occurred: {error}")
+            await ctx.send("An unexpected error occurred. Please try again later.")
 
 
 async def setup(bot: commands.Bot) -> None:
