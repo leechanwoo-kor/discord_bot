@@ -1,14 +1,23 @@
 import asyncio
+import logging
+
 import discord
 from discord.ext import commands
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 class InteractionHandler(commands.Cog):
+
     def __init__(self, bot):
         self.bot = bot
+        self.interaction_handlers = {
+            "pause_resume": self.handle_pause_resume,
+            "skip": self.handle_skip,
+            "stop": self.handle_stop,
+            "loop": self.handle_loop,
+            "show_queue": self.handle_show_queue,
+        }
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
@@ -21,44 +30,23 @@ class InteractionHandler(commands.Cog):
             logger.error("Component interaction does not contain custom_id.")
             return
 
-        music_cog = interaction.client.get_cog("Music")
-        ctx = await interaction.client.get_context(interaction.message)
-
-        handlers = {
-            "pause_resume": self.handle_pause_resume,
-            "skip": self.handle_skip,
-            "stop": self.handle_stop,
-            "loop": self.handle_loop,
-            "show_queue": self.handle_show_queue,
-        }
-
-        handler = handlers.get(custom_id)
+        handler = self.interaction_handlers.get(custom_id)
         if handler:
-            try:
-                await handler(interaction, music_cog, ctx)
-            except discord.errors.InteractionResponded:
-                pass
-            except Exception as e:
-                logger.error(f"Error handling interaction {custom_id}: {e}")
-                try:
-                    await interaction.followup.send(
-                        "An error occurred while processing your request.", ephemeral=True
-                    )
-                except discord.errors.HTTPException:
-                    pass
+            await self._execute_handler(handler, interaction)
         else:
-            logger.warning(f"No handler found for custom_id: {custom_id}")
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message(
-                        "This interaction is not supported.", ephemeral=True
-                    )
-                else:
-                    await interaction.followup.send(
-                        "This interaction is not supported.", ephemeral=True
-                    )
-            except discord.errors.HTTPException as e:
-                logger.error(f"Error sending message for unsupported interaction: {e}")
+            logger.error(f"No handler found for custom_id: {custom_id}")
+
+    async def _execute_handler(self, handler, interaction):
+        try:
+            music_cog = interaction.client.get_cog("Music")
+            ctx = await interaction.client.get_context(interaction.message)
+            await handler(interaction, music_cog, ctx)
+        except discord.errors.InteractionResponded:
+            logger.warning(
+                f"Interaction {interaction.id} has already been responded to."
+            )
+        except Exception as e:
+            logger.error(f"Error handling interaction {interaction.id}: {e}")
 
     async def handle_pause_resume(self, interaction, music_cog, ctx):
         voice_client = interaction.guild.voice_client
@@ -68,30 +56,15 @@ class InteractionHandler(commands.Cog):
         elif voice_client.is_paused():
             voice_client.resume()
             action = "resumed"
-        else:
-            await interaction.response.send_message(
-                "No audio is currently playing.", ephemeral=True
-            )
-            return
 
         await music_cog.send_now_playing(ctx, music_cog.current)
-        await interaction.response.send_message(f"Play {action}.", ephemeral=True)
 
     async def handle_skip(self, interaction, music_cog, ctx):
-        try:
-            if music_cog.now_playing_message:
-                await music_cog.now_playing_message.delete()
-            music_cog.now_playing_message = None
-            if ctx.voice_client and ctx.voice_client.is_playing():
-                ctx.voice_client.stop()
-            await interaction.response.send_message(
-                "Skipped the current song.", ephemeral=True
-            )
-        except Exception as e:
-            logger.error(f"Error in handle_skip: {e}")
-            await interaction.response.send_message(
-                "An error occurred while trying to skip the song.", ephemeral=True
-            )
+        if music_cog.now_playing_message:
+            await music_cog.now_playing_message.delete()
+        music_cog.now_playing_message = None
+        if ctx.voice_client and ctx.voice_client.is_playing():
+            ctx.voice_client.stop()
 
     async def handle_stop(self, interaction, music_cog, ctx):
         if (
@@ -102,19 +75,10 @@ class InteractionHandler(commands.Cog):
                 await music_cog.now_playing_message.delete()
                 music_cog.now_playing_message = None
             await interaction.guild.voice_client.disconnect()
-            await interaction.response.send_message(
-                "Stopped play and disconnected from voice channel.", ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                "I'm not currently in a voice channel.", ephemeral=True
-            )
 
     async def handle_loop(self, interaction, music_cog, ctx):
         music_cog.loop = not music_cog.loop
-        status = "enabled" if music_cog.loop else "disabled"
         await music_cog.send_now_playing(ctx, music_cog.current)
-        await interaction.response.send_message(f"Loop mode {status}.", ephemeral=True)
 
     async def handle_show_queue(self, interaction, music_cog, ctx):
         await interaction.response.defer()
