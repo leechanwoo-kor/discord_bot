@@ -340,12 +340,9 @@ class Music(commands.Cog):
                 return
 
         ctx.voice_client = ctx.guild.voice_client
-        await interaction.response.defer()
         self.queue.append(selected_result)
         if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
             await self.play_url(ctx, self.queue.pop(0))
-        else:
-            await self.send_queue(ctx)
 
     async def show_now_playing(self, interaction: discord.Interaction):
         ctx = await self.bot.get_context(interaction)
@@ -420,6 +417,10 @@ class SearchSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         selected_index = int(self.values[0])
         selected_result = self.results[selected_index]
+        try:
+            await interaction.response.defer()
+        except discord.errors.InteractionResponded:
+            pass
         await self.cog.play_selected(interaction, selected_result)
 
 
