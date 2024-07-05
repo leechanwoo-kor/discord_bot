@@ -36,16 +36,29 @@ class InteractionHandler(commands.Cog):
         if handler:
             try:
                 await handler(interaction, music_cog, ctx)
+            except discord.errors.InteractionResponded:
+                pass
             except Exception as e:
                 logger.error(f"Error handling interaction {custom_id}: {e}")
-                await interaction.response.send_message(
-                    "An error occurred while processing your request.", ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "An error occurred while processing your request.", ephemeral=True
+                    )
+                except discord.errors.HTTPException:
+                    pass
         else:
             logger.warning(f"No handler found for custom_id: {custom_id}")
-            await interaction.response.send_message(
-                "This interaction is not supported.", ephemeral=True
-            )
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "This interaction is not supported.", ephemeral=True
+                    )
+                else:
+                    await interaction.followup.send(
+                        "This interaction is not supported.", ephemeral=True
+                    )
+            except discord.errors.HTTPException as e:
+                logger.error(f"Error sending message for unsupported interaction: {e}")
 
     async def handle_pause_resume(self, interaction, music_cog, ctx):
         voice_client = interaction.guild.voice_client
