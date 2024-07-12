@@ -1,12 +1,13 @@
 import asyncio
 import logging
+from youtubesearchpython import VideosSearch
+
 from typing import List, Optional
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button
-from youtubesearchpython import VideosSearch
 
 from utils.utils import ellipsis, get_translation
 from utils.ytdl import YTDLSource
@@ -22,10 +23,10 @@ class Music(commands.Cog):
         self.queue = []
         self.now_playing_message = None
 
-    async def create_player(self, url: str) -> YTDLSource:
+    async def create_player(self, url):
         return await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
 
-    def get_user_locale(self, ctx: commands.Context) -> str:
+    def get_user_locale(self, ctx):
         # TODO: Implement user locale detection
         return "ko"
 
@@ -45,30 +46,6 @@ class Music(commands.Cog):
     @app_commands.command(name="clear", description="Clear the current music queue")
     async def slash_clear(self, interaction: discord.Interaction):
         await self.clear(interaction)
-
-    # Helper methods
-    async def join_voice_channel(self, ctx: commands.Context) -> None:
-        if not ctx.author.voice:
-            raise commands.CommandError(
-                get_translation("join_voice_channel", self.get_user_locale(ctx))
-            )
-
-        channel = ctx.author.voice.channel
-        if ctx.voice_client:
-            await ctx.voice_client.move_to(channel)
-        else:
-            await channel.connect()
-
-    async def play_next(self, ctx: commands.Context) -> None:
-        if self.queue:
-            next_item = self.queue.pop(0)
-            await self.play_url(ctx, next_item)
-        elif self.loop and self.current:
-            await self.play_url(ctx, self.current)
-        else:
-            self.current = None
-            locale = self.get_user_locale(ctx)
-            await ctx.send(get_translation("queue_empty", locale))
 
     async def play_url(self, ctx, current):
         try:
@@ -103,33 +80,25 @@ class Music(commands.Cog):
         try:
             await self.now_playing_message.delete()
         except discord.errors.NotFound:
-            logger.warning("Could not delete previous now playing message. It may have been already deleted.")
+            logger.warning(
+                "Could not delete previous now playing message. It may have been already deleted."
+            )
         except discord.errors.HTTPException as e:
             logger.error(f"Failed to delete previous message: {e}")
 
-    @commands.command()
-    async def reset(self, ctx):
-        self.__init__(self.bot)
-        await ctx.send("Reset complete.")
-        await ctx.voice_client.disconnect()
-
     @commands.command(aliases=["p", "P", "ㅔ"])
-    async def play(
-        self, ctx: commands.Context, *, keyword: Optional[str] = None
-    ) -> None:
+    async def play(self, ctx, *, keyword=None):
         await self.play_command(ctx, keyword)
 
-    async def play_command(
-        self, ctx: commands.Context, keyword: Optional[str] = None
-    ) -> None:
+    async def play_command(self, ctx, keyword=None):
         locale = self.get_user_locale(ctx)
         if not keyword:
             await ctx.send(get_translation("enter_keyword", locale))
             return
 
         async with ctx.typing():
-            videosSearch = VideosSearch(keyword, limit=1)
-            result = videosSearch.result()["result"][0]
+            video_search = VideosSearch(keyword, limit=1)
+            result = video_search.result()["result"][0]
             self.queue.append(result)
 
             if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
@@ -146,6 +115,17 @@ class Music(commands.Cog):
             fut.result()
         except Exception as e:
             logger.error(f"Error resuming playback: {e}")
+
+    async def play_next(self, ctx):
+        if self.queue:
+            next_item = self.queue.pop(0)
+            await self.play_url(ctx, next_item)
+        elif self.loop and self.current:
+            await self.play_url(ctx, self.current)
+        else:
+            self.current = None
+            locale = self.get_user_locale(ctx)
+            await ctx.send(get_translation("queue_empty", locale))
 
     def create_now_playing_embed(self, ctx, current, locale):
         url = current["link"]
@@ -224,21 +204,18 @@ class Music(commands.Cog):
 
             self.now_playing_message = await ctx.send(embed=embed, view=view)
 
-    async def queue_button_callback(self, interaction: discord.Interaction):
+    async def queue_button_callback(self, interaction):
         custom_id = interaction.data.get("custom_id", "")
         if custom_id.startswith("play_"):
             index = int(custom_id.split("_")[1])
             if index < len(self.queue):
                 selected_song = self.queue.pop(index)
 
-                # 현재 재생 중인 노래 중지
                 if interaction.guild.voice_client.is_playing():
                     interaction.guild.voice_client.stop()
 
-                # 선택한 노래를 현재 재생 목록에 추가
                 self.queue.insert(0, selected_song)
 
-                # 새로운 노래 재생 시작
                 await self.play_next(await self.bot.get_context(interaction))
             else:
                 await interaction.response.send_message(
@@ -266,6 +243,24 @@ class Music(commands.Cog):
                 await ctx.send(message, ephemeral=True)
                 raise commands.CommandError(message)
 
+    async def join_voice_channel(self, ctx):
+        if not ctx.author.voice:
+            raise commands.CommandError(
+                get_translation("join_voice_channel", self.get_user_locale(ctx))
+            )
+
+        channel = ctx.author.voice.channel
+        if ctx.voice_client:
+            await ctx.voice_client.move_to(channel)
+        else:
+            await channel.connect()
+
+    @commands.command()
+    async def reset(self, ctx):
+        self.__init__(self.bot)
+        await ctx.send("Reset complete.")
+        await ctx.voice_client.disconnect()
+
     async def handle_play_command(self, interaction, keyword):
         class Context:
             def __init__(self, interaction, keyword):
@@ -292,9 +287,7 @@ class Music(commands.Cog):
         await interaction.response.defer()
         await self.play_command(ctx, keyword)
 
-    async def handle_search_command(
-        self, interaction: discord.Interaction, keyword: str
-    ):
+    async def handle_search_command(self, interaction, keyword):
         locale = self.get_user_locale(interaction)
         if not keyword:
             await interaction.response.send_message(
@@ -371,8 +364,6 @@ class Music(commands.Cog):
             self.queue.clear()
             await interaction.response.send_message("대기열이 초기화되었습니다.")
 
-            
-
     # Error handling
     async def cog_command_error(self, ctx: commands.Context, error: Exception):
         if isinstance(error, commands.CommandInvokeError):
@@ -387,7 +378,7 @@ class Music(commands.Cog):
             await ctx.send("An unexpected error occurred. Please try again later.")
 
 
-async def setup(bot: commands.Bot) -> None:
+async def setup(bot: commands.Bot):
     try:
         await bot.add_cog(Music(bot))
         logger.info("Music cog loaded successfully")
