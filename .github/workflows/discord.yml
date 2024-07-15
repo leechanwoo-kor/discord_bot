@@ -26,10 +26,23 @@ jobs:
             whoami
             ls -al
             echo "Changing to git directory..."
-            cd git || exit 1
+            cd git || { echo "Failed to change to git directory"; exit 1; }
+            echo "Current directory:"
+            pwd
+            echo "Contents of git directory:"
+            ls -al
             echo "Changing to repository directory..."
-            cd $REPO_NAME || exit 1
-            echo "Running deploy script..."
-            chmod +x deploy.sh
-            sh deploy.sh
+            cd "$REPO_NAME" || { echo "Failed to change to repository directory"; exit 1; }
+            echo "Current directory:"
+            pwd
+            echo "Contents of repository directory:"
+            ls -al
+            if [ -f "deploy.sh" ]; then
+              echo "Running deploy script..."
+              chmod +x deploy.sh
+              ./deploy.sh
+            else
+              echo "deploy.sh not found. Skipping deployment."
+              exit 1
+            fi
             echo "Deployment completed successfully."
