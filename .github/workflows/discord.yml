@@ -10,8 +10,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      REPO_NAME: ${{ github.event.repository.name }}
     steps:
     - name: executing remote ssh commands using ssh key
       uses: appleboy/ssh-action@v1.0.0
@@ -32,7 +30,7 @@ jobs:
             echo "Contents of git directory:"
             ls -al
             echo "Changing to repository directory..."
-            cd "$REPO_NAME" || { echo "Failed to change to repository directory"; exit 1; }
+            cd ${{ github.event.repository.name }} || { echo "Failed to change to repository directory"; exit 1; }
             echo "Current directory:"
             pwd
             echo "Contents of repository directory:"
