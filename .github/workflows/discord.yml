@@ -1,9 +1,17 @@
 name: CICD-SSH
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      REPO_NAME: ${{ github.event.repository.name }}
     steps:
     - name: executing remote ssh commands using ssh key
       uses: appleboy/ssh-action@v1.0.0
@@ -13,11 +21,15 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: 22
         script: |
+            set -e
+            echo "Starting deployment process..."
             whoami
             ls -al
-            cd git
-            cd ${{ github.event.repository.name }}
-            echo "Hello World!"
+            echo "Changing to git directory..."
+            cd git || exit 1
+            echo "Changing to repository directory..."
+            cd $REPO_NAME || exit 1
+            echo "Running deploy script..."
             chmod +x deploy.sh
             sh deploy.sh
-            echo "Done----"
+            echo "Deployment completed successfully."
