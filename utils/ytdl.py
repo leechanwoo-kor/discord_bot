@@ -30,11 +30,9 @@ ytdl_format_options = {
 }
 
 ffmpeg_options = {
-    # "options": "-vn -ar 48000 -b:a 320k",
     # "options": "-vn",
-    # "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-    "options": "-vn -filter:a \"atempo=1.0\" -b:a 192k",
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -ss 00:00:00",
+    "options": "-vn -ar 48000 -b:a 320k",
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
