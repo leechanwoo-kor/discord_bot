@@ -6,8 +6,7 @@ import yt_dlp as youtube_dl
 youtube_dl.utils.bug_reports_message = lambda: ""
 
 ytdl_format_options = {
-    #'format': 'bestaudio',
-    "format": "ba/b",
+    "format": "bestaudio/best",
     "outtmpl": "%(extractor)s-%(id)s-%(title)s.%(ext)s",
     "restrictfilenames": True,
     "noplaylist": True,
@@ -21,18 +20,21 @@ ytdl_format_options = {
     "postprocessors": [
         {
             "key": "FFmpegExtractAudio",
+            "preferredcodec": "opus",
             #'preferredcodec': 'mp3',
             #'preferredcodec': 'wav',
-            "preferredcodec": "m4a",
-            "preferredquality": "64",
+            # "preferredcodec": "m4a",
+            # "preferredquality": "64",
         }
     ],
 }
 
 ffmpeg_options = {
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
     # "options": "-vn -ar 48000 -b:a 320k",
-    "options": "-vn",
+    # "options": "-vn",
+    # "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "options": "-vn -filter:a \"atempo=1.0\" -b:a 192k",
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -ss 00:00:00",
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
