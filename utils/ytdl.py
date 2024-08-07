@@ -20,13 +20,15 @@ ytdl_format_options = {
     "postprocessors": [
         {
             "key": "FFmpegExtractAudio",
-            "preferredcodec": "opus",
-            #'preferredcodec': 'mp3',
+            # "preferredcodec": "opus",
+            "preferredcodec": "mp3",
             #'preferredcodec': 'wav',
             # "preferredcodec": "m4a",
-            # "preferredquality": "64",
+            "preferredquality": "320",
         }
     ],
+    "prefer_ffmpeg": True,
+    "keepvideo": False,
 }
 
 ffmpeg_options = {
