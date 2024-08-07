@@ -32,8 +32,8 @@ ytdl_format_options = {
 }
 
 ffmpeg_options = {
-    # "options": "-vn",
-    "options": "-vn -ar 48000 -b:a 320k",
+    "options": "-vn",
+    # "options": "-vn -ar 48000 -b:a 320k",
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
 }
 
